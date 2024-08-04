@@ -46,18 +46,21 @@ func generateSampleReservations(num int) {
 }
 
 func createReservation(w http.ResponseWriter, r *http.Request) {
+	// Decode the request body into a Reservation struct
 	var reservation Reservation
 	if err := json.NewDecoder(r.Body).Decode(&reservation); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// Assign the next available ID and add the reservation to the slice
 	mutex.Lock()
 	reservation.ID = nextID
 	nextID++
 	reservations = append(reservations, reservation)
 	mutex.Unlock()
 
+	// Return the created reservation
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(reservation)
 }
@@ -69,6 +72,7 @@ func getReservations(w http.ResponseWriter, r *http.Request) {
 }
 
 func getReservation(w http.ResponseWriter, r *http.Request) {
+	// Get the ID from the query string
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -78,6 +82,7 @@ func getReservation(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	// Find the reservation with the given ID and return it
 	for _, reservation := range reservations {
 		if reservation.ID == id {
 			json.NewEncoder(w).Encode(reservation)
@@ -89,12 +94,14 @@ func getReservation(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateReservation(w http.ResponseWriter, r *http.Request) {
+	// Get the ID from the query string
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
 
+	// Decode the request body into a Reservation struct
 	var updatedReservation Reservation
 	if err := json.NewDecoder(r.Body).Decode(&updatedReservation); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -104,6 +111,7 @@ func updateReservation(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	// Find the reservation with the given ID and update it
 	for i, reservation := range reservations {
 		if reservation.ID == id {
 			updatedReservation.ID = reservation.ID
@@ -117,6 +125,7 @@ func updateReservation(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteReservation(w http.ResponseWriter, r *http.Request) {
+	// Get the ID from the query string
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -126,6 +135,7 @@ func deleteReservation(w http.ResponseWriter, r *http.Request) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	// Find the reservation with the given ID and remove it from the slice
 	for i, reservation := range reservations {
 		if reservation.ID == id {
 			reservations = append(reservations[:i], reservations[i+1:]...)
@@ -141,7 +151,7 @@ func main() {
 	// Populate the reservations slice with sample data
 	generateSampleReservations(10)
 
-	// Define routes and handlers here
+	// Routes and handlers
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Welcome to Dinner Reservations API"))
