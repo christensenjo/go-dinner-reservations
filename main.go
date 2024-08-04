@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"sync"
@@ -20,8 +21,29 @@ type Reservation struct {
 var (
 	reservations = []Reservation{}
 	nextID       = 1
-	mutex        = sync.Mutex
+	mutex        sync.Mutex
 )
+
+func generateSampleReservations(num int) {
+	names := []string{"John Doe", "Jane Smith", "Alice Johnson", "Bob Brown", "Emma Wilson"}
+	times := []string{"18:00", "19:00", "20:00", "21:00"}
+	dates := []string{"2024-09-01", "2024-09-02", "2024-09-03", "2024-09-04"}
+
+	for i := 0; i < num; i++ {
+		newReservation := Reservation{
+			ID:     nextID,
+			Name:   names[rand.Intn(len(names))],
+			Date:   dates[rand.Intn(len(dates))],
+			Time:   times[rand.Intn(len(times))],
+			Guests: rand.Intn(10) + 1,
+			Phone:  "555-0" + strconv.Itoa(rand.Intn(1000)+1000),
+		}
+		mutex.Lock()
+		reservations = append(reservations, newReservation)
+		nextID++
+		mutex.Unlock()
+	}
+}
 
 func createReservation(w http.ResponseWriter, r *http.Request) {
 	var reservation Reservation
@@ -116,6 +138,9 @@ func deleteReservation(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Populate the reservations slice with sample data
+	generateSampleReservations(10)
+
 	// Define routes and handlers here
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
