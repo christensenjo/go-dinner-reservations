@@ -42,8 +42,37 @@ func createReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}{ID: id})
 }
 
-func getReservations(w http.ResponseWriter, r *http.Request) {
-	//
+func getReservations(db *sql.DB, w http.ResponseWriter) {
+	var reservations []Reservation
+	sqlStatement :=
+		`
+		SELECT id, name, date, time, guests, phone
+		FROM reservations
+		`
+	rows, err := db.Query(sqlStatement)
+	if err != nil {
+		http.Error(w, "Failed to get reservations", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var res Reservation
+		if err := rows.Scan(&res.ID, &res.Name, &res.Date, &res.Time, &res.Guests, &res.Phone); err != nil {
+			http.Error(w, "Failed to get reservations", http.StatusInternalServerError)
+			return
+		}
+		reservations = append(reservations, res)
+	}
+
+	if err := rows.Err(); err != nil {
+		http.Error(w, "Failed to get reservations", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(reservations)
 }
 
 func getReservation(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +102,9 @@ func main() {
 	// HTTP Handlers
 	http.HandleFunc("/reservations/create", func(w http.ResponseWriter, r *http.Request) {
 		createReservation(db, w, r)
+	})
+	http.HandleFunc("/reservations", func(w http.ResponseWriter, r *http.Request) {
+		getReservations(db, w)
 	})
 
 	// Start the HTTP server
