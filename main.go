@@ -75,8 +75,33 @@ func getReservations(db *sql.DB, w http.ResponseWriter) {
 	json.NewEncoder(w).Encode(reservations)
 }
 
-func getReservation(w http.ResponseWriter, r *http.Request) {
-	//
+func getReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
+		return
+	}
+
+	var res Reservation
+	sqlStatement :=
+		`
+		SELECT id, name, date, time, guests, phone
+		FROM reservations
+		WHERE id = $1
+		`
+	err := db.QueryRow(sqlStatement, id).Scan(&res.ID, &res.Name, &res.Date, &res.Time, &res.Guests, &res.Phone)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "No reservation found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Failed to get reservation", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(res)
 }
 
 func updateReservation(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +131,7 @@ func main() {
 	http.HandleFunc("/reservations", func(w http.ResponseWriter, r *http.Request) {
 		getReservations(db, w)
 	})
+	// TODO: refactor getReservation to use a URL parameter and implement handler here
 
 	// Start the HTTP server
 	log.Println("Starting server on :8080")
