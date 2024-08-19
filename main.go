@@ -216,20 +216,8 @@ func main() {
 		switch r.Method {
 		case http.MethodGet:
 			getReservation(db, w, r)
-		default:
-			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
-		}
-	})
-	http.HandleFunc("/reservations/update/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
 		case http.MethodPut:
 			updateReservation(db, w, r)
-		default:
-			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
-		}
-	})
-	http.HandleFunc("reservations/delete/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
 		case http.MethodDelete:
 			deleteReservation(db, w, r)
 		default:
