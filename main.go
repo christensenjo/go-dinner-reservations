@@ -141,8 +141,41 @@ func updateReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	}{Message: "Reservation updated successfully"})
 }
 
-func deleteReservation(w http.ResponseWriter, r *http.Request) {
-	//
+func deleteReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	// Extract ID
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 {
+		http.Error(w, "Invalid reservation ID", http.StatusBadRequest)
+		return
+	}
+	id := parts[2]
+
+	// Delete
+	sqlStatement :=
+		`
+	DELETE FROM reservations
+	WHERE id = $1
+	`
+	result, err := db.Exec(sqlStatement, id)
+	if err != nil {
+		http.Error(w, "Failed to delete reservation", http.StatusInternalServerError)
+		return
+	}
+
+	rowsDeleted, err := result.RowsAffected()
+	if err != nil {
+		http.Error(w, "Failed to delete reservation", http.StatusInternalServerError)
+		return
+	}
+	if rowsDeleted == 0 {
+		http.Error(w, "No reservation found with given ID", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(struct {
+		Message string `json:"message"`
+	}{Message: "Reservation deleted successfully"})
 }
 
 func main() {
@@ -176,6 +209,14 @@ func main() {
 		switch r.Method {
 		case http.MethodPut:
 			updateReservation(db, w, r)
+		default:
+			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
+		}
+	})
+	http.HandleFunc("reservations/delete/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			deleteReservation(db, w, r)
 		default:
 			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
 		}
