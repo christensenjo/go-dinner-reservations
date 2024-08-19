@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 type Reservation struct {
@@ -33,6 +37,7 @@ func createReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	id := 0
 	err := db.QueryRow(sqlStatement, res.Name, res.Date, res.Time, res.Guests, res.Phone).Scan(&id)
 	if err != nil {
+		log.Println("Error during reservation creation: ", err)
 		http.Error(w, "Failed to create reservation", http.StatusInternalServerError)
 		return
 	}
@@ -179,23 +184,33 @@ func deleteReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// Load env variables
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	// Database connection
 	dbConfig := DBConfig{
-		Host:     "localhost",
-		Port:     5432,
-		User:     "myuser",
-		Password: "mypassword",
-		DBName:   "dinner_reservations",
+		Host:     os.Getenv("DB_HOST"),
+		Port:     func() int { port, _ := strconv.Atoi(os.Getenv("DB_PORT")); return port }(),
+		User:     os.Getenv("DB_USER"),
+		Password: os.Getenv("DB_PASSWORD"),
+		DBName:   os.Getenv("DB_NAME"),
 	}
 	db := NewDB(dbConfig)
 	defer db.Close()
 
 	// HTTP Handlers
-	http.HandleFunc("/reservations/create", func(w http.ResponseWriter, r *http.Request) {
-		createReservation(db, w, r)
-	})
 	http.HandleFunc("/reservations", func(w http.ResponseWriter, r *http.Request) {
-		getReservations(db, w)
+		switch r.Method {
+		case http.MethodPost:
+			createReservation(db, w, r)
+		case http.MethodGet:
+			getReservations(db, w)
+		default:
+			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
+		}
 	})
 	http.HandleFunc("/reservations/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
