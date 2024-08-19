@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type Reservation struct {
@@ -76,19 +77,21 @@ func getReservations(db *sql.DB, w http.ResponseWriter) {
 }
 
 func getReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		http.Error(w, "Missing 'id' parameter", http.StatusBadRequest)
+	// Extract the ID from the URL path
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 {
+		http.Error(w, "Invalid reservation ID", http.StatusBadRequest)
 		return
 	}
+	id := parts[2]
 
 	var res Reservation
 	sqlStatement :=
 		`
-		SELECT id, name, date, time, guests, phone
-		FROM reservations
-		WHERE id = $1
-		`
+    SELECT id, name, date, time, guests, phone
+    FROM reservations
+    WHERE id = $1
+    `
 	err := db.QueryRow(sqlStatement, id).Scan(&res.ID, &res.Name, &res.Date, &res.Time, &res.Guests, &res.Phone)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -104,8 +107,38 @@ func getReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(res)
 }
 
-func updateReservation(w http.ResponseWriter, r *http.Request) {
-	//
+func updateReservation(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL path
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 3 {
+		http.Error(w, "Invalid reservation ID", http.StatusBadRequest)
+		return
+	}
+	id := parts[2]
+
+	// Decode the update data from the request payload
+	var updateData Reservation
+	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+	// Update
+	sqlStatement :=
+		`
+	UPDATE reservations
+	SET name = $2, date = $3, time = $4, guests = $5, phone = $6
+	WHERE id = $1
+	`
+	_, err := db.Exec(sqlStatement, id, updateData.Name, updateData.Date, updateData.Time, updateData.Guests, updateData.Phone)
+	if err != nil {
+		http.Error(w, "Failed to update reservation", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(struct {
+		Message string `json:"message"`
+	}{Message: "Reservation updated successfully"})
 }
 
 func deleteReservation(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +164,22 @@ func main() {
 	http.HandleFunc("/reservations", func(w http.ResponseWriter, r *http.Request) {
 		getReservations(db, w)
 	})
-	// TODO: refactor getReservation to use a URL parameter and implement handler here
+	http.HandleFunc("/reservations/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			getReservation(db, w, r)
+		default:
+			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
+		}
+	})
+	http.HandleFunc("/reservations/update/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			updateReservation(db, w, r)
+		default:
+			http.Error(w, "Unsupported request method", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Start the HTTP server
 	log.Println("Starting server on :8080")
