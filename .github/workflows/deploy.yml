@@ -33,7 +33,7 @@ jobs:
           chmod 600 ~/.ssh/ec2_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2 using GitHub Action SSH
+      - name: Deploy to EC2
         env:
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -42,6 +42,7 @@ jobs:
           ssh -i ~/.ssh/ec2_key $EC2_USER@$EC2_HOST "
             sudo systemctl stop go-api.service || true
             sudo mv /home/$EC2_USER/main /usr/local/bin/go-api
+            sudo chmod +x /usr/local/bin/go-api
             sudo tee /etc/systemd/system/go-api.service > /dev/null << EOT
             [Unit]
             Description=Go API Service
@@ -60,4 +61,5 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable go-api.service
             sudo systemctl start go-api.service
+            sudo systemctl status go-api.service
           "
