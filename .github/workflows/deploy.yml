@@ -1,0 +1,58 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.20'
+
+      - name: Build Go application
+        run: go build -o main .
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_KEY }}" | base64 -d > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          scp -i ~/.ssh/ec2_key main $EC2_USER@$EC2_HOST:/home/$EC2_USER/
+          ssh -i ~/.ssh/ec2_key $EC2_USER@$EC2_HOST "
+            sudo systemctl stop go-api.service || true
+            sudo mv /home/$EC2_USER/main /usr/local/bin/go-api
+            sudo tee /etc/systemd/system/go-api.service > /dev/null << EOT
+            [Unit]
+            Description=Go API Service
+            After=network.target
+
+            [Service]
+            ExecStart=/usr/local/bin/go-api
+            Restart=always
+            User=$EC2_USER
+            Group=$EC2_USER
+            EnvironmentFile=/home/$EC2_USER/.env
+
+            [Install]
+            WantedBy=multi-user.target
+            EOT
+            sudo systemctl daemon-reload
+            sudo systemctl enable go-api.service
+            sudo systemctl start go-api.service
+          "
