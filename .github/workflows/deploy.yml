@@ -26,12 +26,18 @@ jobs:
       - name: Build Go application
         run: go build -o main .
 
-      - name: Setup SSH
+      - name: Setup SSH (Debug)
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" | base64 -d > ~/.ssh/ec2_key
-          chmod 600 ~/.ssh/ec2_key
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          echo "Creating .ssh directory..."
+          mkdir -p ~/.ssh || echo "Failed to create .ssh directory"
+          ls -la ~/ || echo "Failed to list home directory"
+          echo "Decoding EC2 key..."
+          echo "${{ secrets.EC2_KEY }}" | base64 -d > ~/.ssh/ec2_key || echo "Failed to decode EC2 key"
+          echo "Setting permissions on EC2 key..."
+          chmod 600 ~/.ssh/ec2_key || echo "Failed to set permissions on EC2 key"
+          echo "Adding host key..."
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts || echo "Failed to add host key"
+          echo "SSH setup complete"
 
       - name: Deploy to EC2
         env:
