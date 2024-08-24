@@ -24,7 +24,7 @@ jobs:
           go mod tidy
 
       - name: Build Go application
-        run: go build -o main .
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags '-extldflags "-static"' -o main .
 
       - name: Setup SSH
         run: |
